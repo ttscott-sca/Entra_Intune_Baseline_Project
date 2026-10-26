@@ -1,0 +1,28 @@
+{
+  "@odata.type": "#microsoft.graph.windows10CompliancePolicy",
+  "displayName": "WIN-Compliance-Baseline",
+  "description": "Baseline compliance for Windows 11 devices: encryption, secure boot, Defender, password.",
+  "passwordRequired": true,
+  "passwordMinimumLength": 8,
+  "passwordRequiredType": "alphanumeric",
+  "osMinimumVersion": "10.0.22621",
+  "bitLockerEnabled": true,
+  "secureBootEnabled": true,
+  "codeIntegrityEnabled": true,
+  "defenderEnabled": true,
+  "rtpEnabled": true,
+  "antivirusRequired": true,
+  "antiSpywareRequired": true,
+  "scheduledActionsForRule": [
+    {
+      "ruleName": "PasswordRequired",
+      "scheduledActionConfigurations": [
+        {
+          "actionType": "block",
+          "gracePeriodHours": 24,
+          "notificationTemplateId": "00000000-0000-0000-0000-000000000000"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "displayName": "7-Zip",
+  "description": "Open-source file archiver. Deployed silently as a required app.",
+  "publisher": "Igor Pavlov",
+  "setupFile": "7z-x64.exe",
+  "installCommandLine": "7z-x64.exe /S",
+  "uninstallCommandLine": "\"%ProgramFiles%\\7-Zip\\Uninstall.exe\" /S",
+  "detection": {
+    "path": "C:\\Program Files\\7-Zip",
+    "file": "7z.exe"
+  }
+}
