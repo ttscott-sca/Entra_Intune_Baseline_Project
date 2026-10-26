@@ -1,6 +1,6 @@
 # Entra ID + Intune Secure Endpoint Baseline
 
-![CI](https://github.com/<your-username>/<your-repo>/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/ttscott-sca/Entra_Intune_Baseline_Project/actions/workflows/ci.yml/badge.svg)
 
 A reproducible, code-driven security baseline for a small organization on **Microsoft Entra ID** and **Microsoft Intune**. Identity policy, device enrollment, compliance, and app deployment are defined as code, validated in CI, and documented with the reasoning behind each decision.
 
