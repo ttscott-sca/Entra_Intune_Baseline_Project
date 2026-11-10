@@ -5,6 +5,7 @@
   "passwordRequired": true,
   "passwordMinimumLength": 8,
   "passwordRequiredType": "alphanumeric",
+  "passwordMinimumCharacterSetCount": 3,
   "osMinimumVersion": "10.0.22621",
   "bitLockerEnabled": true,
   "secureBootEnabled": true,
