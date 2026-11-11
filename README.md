@@ -14,8 +14,8 @@ Small organizations often configure identity and endpoints by clicking through a
 | Area | Status | Notes |
 |---|---|---|
 | Entra groups + Conditional Access (Terraform) | Verified | Applied to the lab tenant: 3 groups, 3 policies in report-only mode |
-| Windows compliance policy (JSON + Graph script) | Verified | Deployed and assigned from code; Real-time protection was finished in the portal |
-| Autopilot deployment profile | Verified (portal) | Built in the portal; the Graph beta create call returned a generic 400 (see Known limitations) |
+| Windows compliance policy (JSON + Graph script) | Verified | Deployed and assigned from code; Real-time protection was finished in the portal. On the enrolled test VM, all 12 settings evaluated as compliant |
+| Autopilot deployment profile | Verified | Profile built in the portal (the Graph beta create call returned a generic 400, see Known limitations). A Hyper-V test VM was registered, picked up the profile and enrolled with the `CORP-` name applied |
 | Break-glass account | Verified | Global Administrator, kept out of the policies by the exclusion group |
 | CI (PowerShell lint, Terraform validate) | Verified | Green check on `main` |
 | Non-compliant device report script | Not yet tested | Needs enrolled devices |
@@ -68,6 +68,28 @@ flowchart LR
 
 ![Autopilot profile](docs/screenshots/autopilot-profile.png)
 
+### Test VM enrollment (Autopilot end to end)
+
+A Generation 2 Hyper-V VM (Secure Boot, virtual TPM, Windows 11 Pro) was registered with Autopilot using its hardware hash, enrolled as a test user, and evaluated against the compliance baseline.
+
+**VM joined the dynamic `Autopilot-Devices` group**
+
+![Autopilot group membership](docs/screenshots/autopilot-group.png)
+
+**Enrolled device in Intune: `CORP-` name applied, Compliant, Corporate, primary user set**
+
+![Enrolled device overview](docs/screenshots/vm-overview.png)
+
+The "Device compliance status" panel on this page also lists one additional evaluation in an error state, which I have not traced. The baseline policy itself shows no errors (next screenshot).
+
+**Baseline policy: 12 settings, all compliant, 0 errors**
+
+![Per-setting status](docs/screenshots/per-setting-status.png)
+
+**Tenant compliance summary: 1 compliant device**
+
+![Compliance summary](docs/screenshots/compliance-result.png)
+
 ## Repo layout
 ```
 .
@@ -110,6 +132,9 @@ Walkthroughs: [Autopilot](docs/autopilot.md) · [Win32 apps](docs/win32-apps.md)
 ## Known limitations
 - **Autopilot profile:** the Graph beta create call returned a generic 400 in this tenant, so I built the profile in the portal. The JSON and script are kept as the intended configuration.
 - **Compliance policy:** Real-time protection did not apply from the Graph call and was set in the portal. The Graph readback also does not display the Defender fields, so the portal was the source of truth.
+- **Extra compliance error on the test VM:** the device's overview page shows 2 compliance evaluations, 1 compliant and 1 in error. The baseline policy itself is 12 of 12 compliant with 0 errors, so the error comes from something else evaluating the device. I have not traced it yet.
+- **Virtual machine, not physical hardware:** the Autopilot test used a Hyper-V VM with a virtual TPM. Results on physical devices may differ, especially for BitLocker and attestation.
+- **Manual hardware hash:** the VM's hash was captured with `Get-WindowsAutopilotInfo` and imported as a CSV. A production rollout would use OEM or partner registration.
 - **Untested scripts:** the reporting, offboarding, and Win32 packaging scripts have not been run against enrolled devices yet.
 - **Security defaults** had to be satisfied (MFA registered) before Microsoft Graph PowerShell could sign in.
 
@@ -119,9 +144,14 @@ Walkthroughs: [Autopilot](docs/autopilot.md) · [Win32 apps](docs/win32-apps.md)
 - **Verify in more than one place.** A script reported success, but the portal showed one Defender setting missing, and the Graph readback hid fields the portal did show.
 - **Terraform state does not belong in Git.** I committed it by accident, reset the commit, added a `.gitignore`, and force-pushed with `--force-with-lease`.
 - **Beta APIs can fail without a useful message.** When the Autopilot create call returned a generic 400, I built it in the portal and documented the gap.
+- **Autopilot is a chain, and each link has a delay.** Hardware hash import, then the dynamic group, then profile assignment, then OOBE. Starting the VM before the profile showed Assigned would have missed it. The Autopilot Sync button is also throttled to once every 10 minutes, so repeated clicks produce a harmless error notice.
+- **Hyper-V's enhanced session can block a new Entra user.** After first sign-in it tried to connect over Remote Desktop, which a brand-new user is not allowed to do. Switching to the basic session fixed it.
+- **Small timing details matter in VM setup.** The "press any key to boot from CD" prompt timed out twice. Starting the VM from its console window with the keyboard already focused fixed it.
 
 ## Roadmap
-- [ ] Enroll a test VM through Autopilot and record compliance results
+- [x] Enroll a test VM through Autopilot and record compliance results
+- [ ] Trace the extra compliance evaluation that shows as an error on the test VM
+- [ ] Run the non-compliant device report script against the enrolled VM
 - [ ] Switch CA001 and CA002 from report-only to enforced after reviewing sign-in logs
 - [ ] macOS and mobile compliance policies
 - [ ] Remote Terraform state with OIDC-authenticated CI plans
