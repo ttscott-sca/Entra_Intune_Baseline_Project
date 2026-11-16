@@ -17,6 +17,8 @@ Small organizations often configure identity and endpoints by clicking through a
 | Windows compliance policy (JSON + Graph script) | Verified | Deployed and assigned from code; Real-time protection was finished in the portal. On the enrolled test VM, all 12 settings evaluated as compliant |
 | Autopilot deployment profile | Verified | Profile built in the portal (the Graph beta create call returned a generic 400, see Known limitations). A Hyper-V test VM was registered, picked up the profile and enrolled with the `CORP-` name applied |
 | Break-glass account | Verified | Global Administrator, kept out of the policies by the exclusion group |
+| Break-glass sign-in review script | Not yet tested | Read-only Graph query of the account's sign-ins, see [docs/break-glass-monitoring.md](docs/break-glass-monitoring.md) |
+| Break-glass sign-in alert | Designed, not deployed | Needs an Azure subscription for Log Analytics, which the lab tenant does not have |
 | CI (PowerShell lint, Terraform validate) | Verified | Green check on `main` |
 | Non-compliant device report script | Not yet tested | Needs enrolled devices |
 | Offboarding script | Not yet tested | Supports `-WhatIf` |
@@ -30,7 +32,7 @@ Small organizations often configure identity and endpoints by clicking through a
 | Intune compliance | Windows baseline: BitLocker, Secure Boot, code integrity, Defender, password, minimum OS | `iac/intune/policies/windows-compliance.json` |
 | Autopilot | User-driven Entra join, standard user, `CORP-<serial>` naming | `iac/intune/policies/autopilot-profile.json` |
 | App deployment | 7-Zip as a required Win32 app, defined by `app.json` | `iac/intune/apps/` |
-| Automation | Non-compliant device report, user offboarding | `scripts/` |
+| Automation | Non-compliant device report, break-glass sign-in review, user offboarding | `scripts/` |
 | CI | PowerShell lint, Terraform format and validate | `.github/workflows/ci.yml` |
 
 ## Architecture
@@ -126,6 +128,7 @@ Walkthroughs: [Autopilot](docs/autopilot.md) · [Win32 apps](docs/win32-apps.md)
 ## Security notes
 - Conditional Access policies are in **report-only** mode. I review sign-in logs before enforcing anything.
 - A break-glass account is excluded from every policy to prevent lockout. Its credentials are stored offline and never in this repo.
+- Sign-ins by the break-glass account can be reviewed with `scripts/reporting/Get-BreakGlassSignIns.ps1`. A near-real-time alert is designed but not deployed (see [docs/break-glass-monitoring.md](docs/break-glass-monitoring.md)).
 - No secrets, installers, or Terraform state are committed (see `.gitignore`).
 - Scripts support `-WhatIf` and request least-privilege Graph scopes.
 
@@ -152,6 +155,8 @@ Walkthroughs: [Autopilot](docs/autopilot.md) · [Win32 apps](docs/win32-apps.md)
 - [x] Enroll a test VM through Autopilot and record compliance results
 - [ ] Trace the extra compliance evaluation that shows as an error on the test VM
 - [ ] Run the non-compliant device report script against the enrolled VM
+- [ ] Run the break-glass sign-in review script against the lab tenant
+- [ ] Deploy the break-glass sign-in alert once the lab has an Azure subscription
 - [ ] Switch CA001 and CA002 from report-only to enforced after reviewing sign-in logs
 - [ ] macOS and mobile compliance policies
 - [ ] Remote Terraform state with OIDC-authenticated CI plans
