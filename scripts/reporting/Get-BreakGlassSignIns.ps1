@@ -31,8 +31,20 @@
     Exit with code 2 if any sign-in is found. Useful when the script runs in a
     scheduled job that should raise a failure.
 
+.PARAMETER TenantId
+    Optional tenant ID or domain (for example contoso.onmicrosoft.com) to sign in
+    to. Use it when you have more than one lab tenant, so you do not end up in the
+    wrong one.
+
+.PARAMETER UseDeviceCode
+    Sign in with a device code (a code you enter at microsoft.com/devicelogin)
+    instead of a browser pop-up. Use it if the browser sign-in fails.
+
 .EXAMPLE
     ./Get-BreakGlassSignIns.ps1 -UserPrincipalName breakglass@contoso.onmicrosoft.com
+
+.EXAMPLE
+    ./Get-BreakGlassSignIns.ps1 -UserPrincipalName breakglass@contoso.onmicrosoft.com -TenantId contoso.onmicrosoft.com -UseDeviceCode
 
 .EXAMPLE
     ./Get-BreakGlassSignIns.ps1 -UserPrincipalName breakglass@contoso.onmicrosoft.com -Days 7 -OutputPath ./breakglass.csv -WhatIf
@@ -58,12 +70,27 @@ param(
 
     [string]$OutputPath,
 
-    [switch]$FailIfFound
+    [switch]$FailIfFound,
+
+    [string]$TenantId,
+
+    [switch]$UseDeviceCode
 )
 
 $ErrorActionPreference = 'Stop'
 
-Connect-MgGraph -Scopes 'AuditLog.Read.All', 'Directory.Read.All' -NoWelcome
+$connectParams = @{
+    Scopes    = 'AuditLog.Read.All', 'Directory.Read.All'
+    NoWelcome = $true
+}
+if ($TenantId) { $connectParams.TenantId = $TenantId }
+if ($UseDeviceCode) { $connectParams.UseDeviceCode = $true }
+
+Connect-MgGraph @connectParams
+
+# Show which tenant and account the script is using, so a wrong tenant is obvious.
+$context = Get-MgContext
+Write-Output "Connected to tenant $($context.TenantId) as $($context.Account)"
 
 $since = (Get-Date).ToUniversalTime().AddDays(-$Days).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
 
