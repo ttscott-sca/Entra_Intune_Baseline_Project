@@ -61,6 +61,10 @@ flowchart LR
 
 ![Break-glass exclusion group membership](docs/screenshots/break-glass-membership.png)
 
+**Break-glass sign-in review, no sign-ins in the last 30 days**
+
+![Break-glass review script: no sign-ins](docs/screenshots/break-glass-script-no-signins.png)
+
 **Windows compliance policy**
 
 ![Compliance policy settings, part 1](docs/screenshots/compliance-policy-1.png)
