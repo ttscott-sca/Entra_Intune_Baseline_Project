@@ -14,7 +14,14 @@ The break-glass account is a Global Administrator kept out of every Conditional 
 ./scripts/reporting/Get-BreakGlassSignIns.ps1 -UserPrincipalName <break-glass-upn> -Days 30
 ```
 
-- Read-only. It requests the `AuditLog.Read.All` and `Directory.Read.All` scopes.
+- Read-only. By default it signs in with Microsoft Graph PowerShell and requests the `AuditLog.Read.All` and `Directory.Read.All` scopes.
+- If the tenant blocks the Microsoft Graph PowerShell app, sign in with the Azure CLI and add `-UseAzCli`. In my lab tenant, security defaults blocked Graph PowerShell for a regular admin account (error 530035) while the Azure CLI worked:
+
+  ```powershell
+  az login --tenant <tenant> --allow-no-subscriptions --use-device-code
+  ./scripts/reporting/Get-BreakGlassSignIns.ps1 -UserPrincipalName <break-glass-upn> -UseAzCli
+  ```
+
 - The expected result is "No sign-ins found".
 - Add `-OutputPath` for a CSV and `-WhatIf` to preview the file write.
 - Add `-FailIfFound` to make a scheduled job fail when a sign-in exists.
