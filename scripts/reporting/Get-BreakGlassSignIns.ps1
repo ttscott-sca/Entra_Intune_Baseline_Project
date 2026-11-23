@@ -10,6 +10,12 @@
     It is read-only. The only thing it can write is an optional CSV file, and that
     write honours -WhatIf.
 
+    Two ways to sign in:
+      * Default: Microsoft Graph PowerShell (Connect-MgGraph).
+      * -UseAzCli: reuse an existing Azure CLI sign-in (az login). Use this if your
+        tenant's security settings block the Microsoft Graph PowerShell app, which
+        happened in my lab tenant (error 530035, security defaults).
+
     Limits to know about:
       * Only interactive sign-ins are returned by the v1.0 sign-in log endpoint.
         Break-glass accounts sign in interactively, so this covers the use case.
@@ -33,31 +39,37 @@
 
 .PARAMETER TenantId
     Optional tenant ID or domain (for example contoso.onmicrosoft.com) to sign in
-    to. Use it when you have more than one lab tenant, so you do not end up in the
-    wrong one.
+    to with Microsoft Graph PowerShell. Use it when you have more than one lab
+    tenant. Ignored with -UseAzCli, where the tenant comes from your az login.
 
 .PARAMETER UseDeviceCode
-    Sign in with a device code (a code you enter at microsoft.com/devicelogin)
-    instead of a browser pop-up. Use it if the browser sign-in fails.
+    Sign in to Microsoft Graph PowerShell with a device code instead of a browser
+    pop-up. Ignored with -UseAzCli.
+
+.PARAMETER UseAzCli
+    Use the signed-in Azure CLI session instead of Microsoft Graph PowerShell.
+    Run this first:  az login --tenant <tenant> --allow-no-subscriptions
 
 .EXAMPLE
     ./Get-BreakGlassSignIns.ps1 -UserPrincipalName breakglass@contoso.onmicrosoft.com
 
 .EXAMPLE
-    ./Get-BreakGlassSignIns.ps1 -UserPrincipalName breakglass@contoso.onmicrosoft.com -TenantId contoso.onmicrosoft.com -UseDeviceCode
+    az login --tenant contoso.onmicrosoft.com --allow-no-subscriptions --use-device-code
+    ./Get-BreakGlassSignIns.ps1 -UserPrincipalName breakglass@contoso.onmicrosoft.com -UseAzCli
 
 .EXAMPLE
     ./Get-BreakGlassSignIns.ps1 -UserPrincipalName breakglass@contoso.onmicrosoft.com -Days 7 -OutputPath ./breakglass.csv -WhatIf
 
 .NOTES
-    Requires PowerShell 7+ and the Microsoft.Graph.Authentication module.
-    Graph scopes requested: AuditLog.Read.All and Directory.Read.All (read only).
+    Requires PowerShell 7+.
+    Default sign-in also needs the Microsoft.Graph.Authentication module and asks
+    for the read-only Graph scopes AuditLog.Read.All and Directory.Read.All.
+    -UseAzCli needs the Azure CLI instead.
     The signed-in admin also needs a role that can read sign-in logs, such as
     Reports Reader, Security Reader or Global Reader.
 #>
 
 #Requires -Version 7.0
-#Requires -Modules Microsoft.Graph.Authentication
 
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -74,23 +86,56 @@ param(
 
     [string]$TenantId,
 
-    [switch]$UseDeviceCode
+    [switch]$UseDeviceCode,
+
+    [switch]$UseAzCli
 )
 
 $ErrorActionPreference = 'Stop'
 
-$connectParams = @{
-    Scopes    = 'AuditLog.Read.All', 'Directory.Read.All'
-    NoWelcome = $true
+$script:AzToken = $null
+
+if ($UseAzCli) {
+    if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+        throw 'The Azure CLI (az) was not found. Install it, then run: az login --tenant <tenant> --allow-no-subscriptions'
+    }
+    $script:AzToken = az account get-access-token --resource-type ms-graph --query accessToken -o tsv
+    if ($LASTEXITCODE -ne 0 -or -not $script:AzToken) {
+        throw 'Could not get a Microsoft Graph token from the Azure CLI. Run: az login --tenant <tenant> --allow-no-subscriptions'
+    }
+    $azTenant = az account show --query tenantId -o tsv
+    $azUser = az account show --query user.name -o tsv
+    Write-Output "Using Azure CLI sign-in: tenant $azTenant, account $azUser"
 }
-if ($TenantId) { $connectParams.TenantId = $TenantId }
-if ($UseDeviceCode) { $connectParams.UseDeviceCode = $true }
+else {
+    if (-not (Get-Module -ListAvailable -Name Microsoft.Graph.Authentication)) {
+        throw 'The Microsoft.Graph.Authentication module is missing. Run: Install-Module Microsoft.Graph.Authentication -Scope CurrentUser'
+    }
 
-Connect-MgGraph @connectParams
+    $connectParams = @{
+        Scopes    = 'AuditLog.Read.All', 'Directory.Read.All'
+        NoWelcome = $true
+    }
+    if ($TenantId) { $connectParams.TenantId = $TenantId }
+    if ($UseDeviceCode) { $connectParams.UseDeviceCode = $true }
 
-# Show which tenant and account the script is using, so a wrong tenant is obvious.
-$context = Get-MgContext
-Write-Output "Connected to tenant $($context.TenantId) as $($context.Account)"
+    Connect-MgGraph @connectParams
+
+    # Show which tenant and account the script is using, so a wrong tenant is obvious.
+    $context = Get-MgContext
+    Write-Output "Connected to tenant $($context.TenantId) as $($context.Account)"
+}
+
+function Invoke-GraphGet {
+    param([Parameter(Mandatory)][string]$Uri)
+
+    if ($script:AzToken) {
+        Invoke-RestMethod -Method Get -Uri $Uri -Headers @{ Authorization = "Bearer $($script:AzToken)" }
+    }
+    else {
+        Invoke-MgGraphRequest -Method GET -Uri $Uri
+    }
+}
 
 $since = (Get-Date).ToUniversalTime().AddDays(-$Days).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
 
@@ -102,7 +147,7 @@ $uri = 'https://graph.microsoft.com/v1.0/auditLogs/signIns?$filter=' +
 
 $events = [System.Collections.Generic.List[object]]::new()
 while ($uri) {
-    $page = Invoke-MgGraphRequest -Method GET -Uri $uri
+    $page = Invoke-GraphGet -Uri $uri
     foreach ($item in $page.value) { $events.Add($item) }
     $uri = $page.'@odata.nextLink'
 }
@@ -123,9 +168,10 @@ $report = $events | ForEach-Object {
     }
 } | Sort-Object TimeUtc -Descending
 
+if (-not $UseAzCli) { Disconnect-MgGraph | Out-Null }
+
 if (-not $report) {
     Write-Output "No sign-ins found for $UserPrincipalName in the last $Days day(s). This is the expected result."
-    Disconnect-MgGraph | Out-Null
     return
 }
 
@@ -140,7 +186,5 @@ if ($OutputPath) {
         Write-Output "Report written to $OutputPath"
     }
 }
-
-Disconnect-MgGraph | Out-Null
 
 if ($FailIfFound) { exit 2 }
