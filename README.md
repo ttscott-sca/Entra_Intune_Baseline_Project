@@ -17,7 +17,7 @@ Small organizations often configure identity and endpoints by clicking through a
 | Windows compliance policy (JSON + Graph script) | Verified | Deployed and assigned from code; Real-time protection was finished in the portal. On the enrolled test VM, all 12 settings evaluated as compliant |
 | Autopilot deployment profile | Verified | Profile built in the portal (the Graph beta create call returned a generic 400, see Known limitations). A Hyper-V test VM was registered, picked up the profile and enrolled with the `CORP-` name applied |
 | Break-glass account | Verified | Global Administrator, kept out of the policies by the exclusion group |
-| Break-glass sign-in review script | Not yet tested | Read-only Graph query of the account's sign-ins, see [docs/break-glass-monitoring.md](docs/break-glass-monitoring.md) |
+| Break-glass sign-in review script | Verified | Run against the lab tenant. Reports no sign-ins for the break-glass account, and lists sign-ins correctly for a test account. See [docs/break-glass-monitoring.md](docs/break-glass-monitoring.md) |
 | Break-glass sign-in alert | Designed, not deployed | Needs an Azure subscription for Log Analytics, which the lab tenant does not have |
 | CI (PowerShell lint, Terraform validate) | Verified | Green check on `main` |
 | Non-compliant device report script | Not yet tested | Needs enrolled devices |
@@ -138,7 +138,8 @@ Walkthroughs: [Autopilot](docs/autopilot.md) · [Win32 apps](docs/win32-apps.md)
 - **Extra compliance error on the test VM:** the device's overview page shows 2 compliance evaluations, 1 compliant and 1 in error. The baseline policy itself is 12 of 12 compliant with 0 errors, so the error comes from something else evaluating the device. I have not traced it yet.
 - **Virtual machine, not physical hardware:** the Autopilot test used a Hyper-V VM with a virtual TPM. Results on physical devices may differ, especially for BitLocker and attestation.
 - **Manual hardware hash:** the VM's hash was captured with `Get-WindowsAutopilotInfo` and imported as a CSV. A production rollout would use OEM or partner registration.
-- **Untested scripts:** the reporting, offboarding, and Win32 packaging scripts have not been run against enrolled devices yet.
+- **Untested scripts:** the non-compliant device report, offboarding, and Win32 packaging scripts have not been run against enrolled devices yet.
+- **Graph PowerShell blocked by security defaults:** in this tenant, a regular admin account was refused by the Microsoft Graph PowerShell app (error 530035) even with MFA registered. The Azure CLI sign-in was not blocked, so the break-glass review script supports `-UseAzCli`. I did not find the root cause.
 - **Security defaults** had to be satisfied (MFA registered) before Microsoft Graph PowerShell could sign in.
 
 ## What I learned
@@ -155,7 +156,7 @@ Walkthroughs: [Autopilot](docs/autopilot.md) · [Win32 apps](docs/win32-apps.md)
 - [x] Enroll a test VM through Autopilot and record compliance results
 - [ ] Trace the extra compliance evaluation that shows as an error on the test VM
 - [ ] Run the non-compliant device report script against the enrolled VM
-- [ ] Run the break-glass sign-in review script against the lab tenant
+- [x] Run the break-glass sign-in review script against the lab tenant
 - [ ] Deploy the break-glass sign-in alert once the lab has an Azure subscription
 - [ ] Switch CA001 and CA002 from report-only to enforced after reviewing sign-in logs
 - [ ] macOS and mobile compliance policies
